@@ -12,7 +12,6 @@ class AIRouting(BASE_routing):
         self.taken_actions = {}  #id event : (old_action)
 
         self.max_delay = self.simulator.event_duration #int: steps, number of time steps that an event lasts  -> to seconds = step * step_duration
-        self.n_actions = {}
         self.Q_table = {}
 
     def feedback(self, drone, id_event, delay, outcome):
@@ -35,14 +34,6 @@ class AIRouting(BASE_routing):
             action = self.taken_actions[id_event]
             del self.taken_actions[id_event]
 
-            # reward = 0
-            # if outcome == -1:
-            #     reward = (delay/self.max_delay)
-            # else:
-            #     reward = (1 - (delay/self.max_delay))
-            #
-            # self.update_Q(action, reward)
-
     def relay_selection(self, opt_neighbors, pkd):
         """ arg min score  -> geographical approach, take the drone closest to the depot """
         # Notice all the drones have different speed, and radio performance!!
@@ -60,26 +51,6 @@ class AIRouting(BASE_routing):
         action = None
         neighbors = [drone for _, drone in opt_neighbors]
 
-        # context = (tuple(neighbors), cell_index)
-        # key_actions = [key for key in self.Q_table if context == (key[0], key[1])]
-        #
-        # if key_actions: #AI
-        #     if self.rnd_for_routing_ai.uniform(0, 1) < self.epsilon: #epsilon action
-        #         action = self.epsilon_action(neighbors)
-        #     else:
-        #         value_actions = [self.Q_table[k] for k in key_actions] #classical greedy action
-        #         action = self.greedy_action(value_actions)
-        #
-        # else: # not AI
-
-        # if one packet is expiring or the simulation is ending, move to the depot
-        if self.drone.packet_is_expiring(self.simulator.cur_step) or self.simulation_ending(self.simulator.cur_step):
-            action = -1
-
-        # use georouting based on the y-axis
-        else:
-            action = self.georouting(opt_neighbors)
-
         # self.drone.history_path (which waypoint I traversed. We assume the mission is repeated)
         # self.drone.residual_energy (that tells us when I'll come back to the depot).
         #  .....
@@ -94,50 +65,11 @@ class AIRouting(BASE_routing):
         # 0, ... , self.ndrones --> send packet to this drone
         return action  # here you should return a drone object!
 
-
     def print(self):
         """
             This method is called at the end of the simulation, can be useful to print some
                 metrics about the learning process
         """
-        pass
-
-    def georouting(self, opt_neighbors):
-
-        action = None
-        best_drone_distance_from_depot = util.euclidean_distance(self.simulator.depot.coords, self.drone.coords)
-
-        for hpk, drone_instance in opt_neighbors:
-
-            # best drone based on vertical waypoint, but we can change this
-            if self.drone.waypoint_history and drone_instance.waypoint_history:
-                if drone_instance.waypoint_history[-1][1] < self.drone.waypoint_history[-1][1]:
-                    action = drone_instance
-
-            # to avoid crash at the beginning
-            else:
-                exp_position = self.__estimated_neighbor_drone_position(hpk)
-                exp_distance = util.euclidean_distance(exp_position, self.simulator.depot.coords)
-                if exp_distance < best_drone_distance_from_depot:
-                    best_drone_distance_from_depot = exp_distance
-                    action = drone_instance
-
-        return action
-
-    def update_Q(self, action, reward):
-
-        n_previous = [self.n_actions[a] + 1 if a in self.n_actions else 1 for a in action]
-        self.n_actions.update(dict(zip(action, n_previous)))
-
-        q = [self.Q_table[a] + 1 / self.n_actions[a] * (reward - self.Q_table[a]) if a in self.Q_table else reward for a in action]
-        self.Q_table.update(dict(zip(action, q)))
-
-    def epsilon_action(self, neighbors):
-        neighbors.append(None)
-        drone = self.rnd_for_routing_ai.choice(neighbors)
-        return drone
-
-    def greedy_action(self, neighbors, value_actions):
         pass
 
     def __estimated_neighbor_drone_position(self, hello_message):
