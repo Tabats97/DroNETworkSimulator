@@ -37,7 +37,12 @@ class AIRouting(BASE_routing):
             del self.taken_actions[id_event]'''
         if id_event in self.waiting:
             if outcome == -1:
+                if self.drone.identifier == 0:
+                    print("I LOST THE PACKET " + str(id_event))
+                    print("OLD: " + str(self.Q_values))
                 self._updateQ(States.WAIT, Actions.REMAIN, -5000, States.WAIT)
+                if self.drone.identifier == 0:
+                    print("NEW: " + str(self.Q_values))
             del self.waiting[id_event]
 
     def relay_selection(self, opt_neighbors, pkd):
@@ -61,7 +66,7 @@ class AIRouting(BASE_routing):
         if len(opt_neighbors) == 0:
 
             if self.drone.identifier == 0:
-                print("NO VICINI")
+                print("NO VICINI " + str(pkd_id))
 
             if pkd_id not in self.waiting:
                 self.waiting[pkd_id] = self.simulator.cur_step
@@ -83,20 +88,21 @@ class AIRouting(BASE_routing):
                 reward = +1 #completely arbitrary, DOBBIAMO PARLARNE
                 self._updateQ(state, action, reward, States.WAIT)
                 self.cur_state = States.WAIT #choice is already None
-            else:
+            else: #state == States.WAIT and action == Action.REMAIN
                 self.cur_state = States.WAIT
             if self.drone.identifier == 0:
                 print("I am in state " + state.name + " and I chose action " + action.name + ", so now I will go to the state " + self.cur_state.name)
+                print("NEW: " + str(self.Q_values))
 
         else:
             if pkd_id in self.waiting: #good news, I waited and then I found a neighbour for this packet
-                cost = -(self.simulator.cur_step - self.waiting[pkd_id])
+                reward = 1/(self.simulator.cur_step - self.waiting[pkd_id]) * 1000
                 #should only be done if communication successful
                 del self.waiting[pkd_id]
                 if self.drone.identifier == 0:
-                    print("I found a neighbour for packet " + str(pkd_id))
+                    print("I found a neighbour for packet " + str(pkd_id) + " and I gained reward " + str(reward))
                     print("OLD: " + str(self.Q_values))
-                self._updateQ(States.WAIT, Actions.REMAIN, cost, States.WAIT) #NON SONO CONVINTA
+                self._updateQ(States.WAIT, Actions.REMAIN, reward, States.WAIT) #NON SONO CONVINTA
                 if self.drone.identifier == 0:
                     print("NEW: " + str(self.Q_values))
 
