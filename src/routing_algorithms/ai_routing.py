@@ -14,6 +14,7 @@ class Actions(Enum):
     REMAIN = auto() #self-loop in the state
     CHANGE = auto() #transition from one state to the other
 
+
 class AIRouting(BASE_routing):
     def __init__(self, drone, simulator):
         BASE_routing.__init__(self, drone, simulator)
