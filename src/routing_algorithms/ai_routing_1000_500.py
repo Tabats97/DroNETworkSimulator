@@ -15,7 +15,7 @@ class Actions(Enum):
     CHANGE = auto()  # transition from one state to the other
 
 
-class AIRouting(BASE_routing):
+class AIRouting_1000(BASE_routing):
     def __init__(self, drone, simulator):
         BASE_routing.__init__(self, drone, simulator)
         # random generator
@@ -40,8 +40,9 @@ class AIRouting(BASE_routing):
             self.waiting.discard(id_event)
 
     def relay_selection(self, opt_neighbors, pkd):
-        # if self.drone.move_routing: #if I am already returning to the depot then I keep all my packets
-        #    return None
+        
+        if self.drone.move_routing: #if I am already returning to the depot then I keep all my packets
+            return None
 
         pkd_id = pkd.event_ref.identifier
         choice = None
@@ -57,7 +58,7 @@ class AIRouting(BASE_routing):
 
             if (state == States.MOVE and action == Actions.REMAIN) or (state == States.WAIT and action == Actions.CHANGE):
                 time_to_depot = util.euclidean_distance(self.simulator.depot.coords, self.drone.coords) / self.drone.speed
-                cost = -((time_to_depot * 2) + 4)
+                cost = -time_to_depot * 2 #* 10
                 self._updateQ(state, action, cost, States.MOVE)
                 self.cur_state = States.MOVE
                 choice = -1
@@ -74,7 +75,7 @@ class AIRouting(BASE_routing):
                 elif pkd_id not in self.waiting:
                     # the reward is delayed for this choice, it can either be positive or negative
                     # depending on if we will find a neighbour for the packet
-                    self.waiting.add(pkd_id)  # self.waiting[pkd_id] = self.simulator.cur_step
+                    self.waiting.add(pkd_id)
                     
         else:
             best_choice = False
@@ -95,7 +96,7 @@ class AIRouting(BASE_routing):
 
             # good news, I waited and then I found a neighbour for this packet
             if choice is not None and pkd_id in self.waiting:
-                reward = 400 if best_choice else 100  # 1000 if best_choice else 500 #1/(self.simulator.cur_step - self.waiting[pkd_id]) * 1000
+                reward = 1000 if best_choice else 500
                 self._updateQ(States.WAIT, Actions.REMAIN, reward, States.WAIT)
                 self.waiting.discard(pkd_id)  # note that at the next step I could add this packet again if the transmission was not successful
 
