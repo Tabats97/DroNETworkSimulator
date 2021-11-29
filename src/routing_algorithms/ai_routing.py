@@ -32,17 +32,9 @@ class AIRouting(BASE_routing):
                         (States.MOVE, Actions.REMAIN):0, (States.MOVE, Actions.CHANGE):0}
 
     def feedback(self, drone, id_event, delay, outcome):
-        '''if id_event in self.taken_actions:
-            action = self.taken_actions[id_event]
-            del self.taken_actions[id_event]'''
         if id_event in self.waiting:
             if outcome == -1:
-                if self.drone.identifier == 0:
-                    print("I LOST THE PACKET " + str(id_event))
-                    print("OLD: " + str(self.Q_values))
                 self._updateQ(States.WAIT, Actions.REMAIN, -5000, States.WAIT)
-                if self.drone.identifier == 0:
-                    print("NEW: " + str(self.Q_values))
             del self.waiting[id_event]
 
     def relay_selection(self, opt_neighbors, pkd):
@@ -57,26 +49,19 @@ class AIRouting(BASE_routing):
         #                                                x_pos=self.drone.coords[0],  # e.g. 1500
         #                                                y_pos=self.drone.coords[1])[0]  # e.g. 500
         # print(cell_index)
+        
+        #if self.drone.move_routing: #if I am already returning to the depot then I keep all my packets
+        #    return None
+
         pkd_id = pkd.event_ref.identifier
         
         choice = None
-        best_drone_distance_from_depot = util.euclidean_distance(self.simulator.depot.coords, self.drone.coords)
-        
+     
         #we use Q_learning to decide what to do when we don't have any neighbours: we wait for one or we move to the depot?
         if len(opt_neighbors) == 0:
 
-            if self.drone.identifier == 0:
-                print("NO VICINI " + str(pkd_id))
-
-            if pkd_id not in self.waiting:
-                self.waiting[pkd_id] = self.simulator.cur_step
-                if self.drone.identifier == 0:
-                    print("I am now waiting to give packet " + str(pkd_id) + " to somebody")
-
             state = self.cur_state
             
-            if self.drone.identifier == 0:
-                print("CURRENT STATE " + str(state.name) + " - possible choices: REMAIN " + str(self.Q_values[(state, Actions.REMAIN)]) + " - CHANGE " + str(self.Q_values[(state, Actions.CHANGE)]) )
             index = np.argmax([self.Q_values[(state, Actions.REMAIN)], self.Q_values[(state, Actions.CHANGE)]])
             action = Actions.REMAIN if index == 0 else Actions.CHANGE #best action in our current state
             if (state == States.MOVE and action == Actions.REMAIN) or (state == States.WAIT and action == Actions.CHANGE):
@@ -84,40 +69,33 @@ class AIRouting(BASE_routing):
                 self._updateQ(state, action, cost, States.MOVE)
                 self.cur_state = States.MOVE
                 choice = -1
-            elif (state == States.MOVE and action == Actions.CHANGE):
-                reward = +1 #completely arbitrary, DOBBIAMO PARLARNE
-                self._updateQ(state, action, reward, States.WAIT)
+            else:
                 self.cur_state = States.WAIT #choice is already None
-            else: #state == States.WAIT and action == Action.REMAIN
-                self.cur_state = States.WAIT
-            if self.drone.identifier == 0:
-                print("I am in state " + state.name + " and I chose action " + action.name + ", so now I will go to the state " + self.cur_state.name)
-                print("NEW: " + str(self.Q_values))
-
+                if (state == States.MOVE and action == Actions.CHANGE):
+                    #if packet_exp --> -100 (o dipende dal numero di pacchetti nel buffer)
+                    self._updateQ(state, action, 0, States.WAIT)
+                elif pkd_id not in self.waiting:
+                    #the reward is delayed for this choice, it can either be positive or negative
+                    #depending on if we will find a neighbour for the packet
+                    self.waiting[pkd_id] = self.simulator.cur_step
+            
         else:
-            if pkd_id in self.waiting: #good news, I waited and then I found a neighbour for this packet
-                reward = 1/(self.simulator.cur_step - self.waiting[pkd_id]) * 1000
-                #should only be done if communication successful
-                del self.waiting[pkd_id]
-                if self.drone.identifier == 0:
-                    print("I found a neighbour for packet " + str(pkd_id) + " and I gained reward " + str(reward))
-                    print("OLD: " + str(self.Q_values))
-                self._updateQ(States.WAIT, Actions.REMAIN, reward, States.WAIT) #NON SONO CONVINTA
-                if self.drone.identifier == 0:
-                    print("NEW: " + str(self.Q_values))
-
+            best_choice = False
+            best_drone_distance_from_depot = util.euclidean_distance(self.simulator.depot.coords, self.drone.coords)
             for hpk, drone_instance in opt_neighbors:
                 #if one of my neighbour is going to the depot, then I give my packets to him
                 if hpk.move_to_depot:
                     choice = drone_instance
+                    best_choice = True
                     break
                 exp_distance = util.euclidean_distance(hpk.cur_pos, self.simulator.depot.coords)
                 if exp_distance < best_drone_distance_from_depot:
                     best_drone_distance_from_depot = exp_distance
                     choice = drone_instance
-
-        # Store your current action --- you can add several stuff if needed to take a reward later
-        #self.taken_actions[pkd.event_ref.identifier] = (choice)
+            if choice is not None and pkd_id in self.waiting: #good news, I waited and then I found a neighbour for this packet
+                reward = 500 if best_choice else 100 #1/(self.simulator.cur_step - self.waiting[pkd_id]) * 1000
+                self._updateQ(States.WAIT, Actions.REMAIN, reward, States.WAIT)
+                del self.waiting[pkd_id] #note that at the next step I could add this packet again if the transmission was not successful
 
         return choice
 
