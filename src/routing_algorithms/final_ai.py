@@ -58,7 +58,6 @@ class AIRouting_final(BASE_routing):
         if len(opt_neighbors) == 0:
 
             state = self.cur_state
-            self.counter += 1
 
             #with up to 5 drones we use the epsilon decay, otherwise epsilon is fixed
             random_case_prob = self.exp_prob if self.simulator.n_drones <= 5 else self.epsilon
@@ -74,19 +73,21 @@ class AIRouting_final(BASE_routing):
                 index = np.argmax([self.Q_values[(state, Actions.REMAIN)], self.Q_values[(state, Actions.CHANGE)]])
                 action = Actions.REMAIN if index == 0 else Actions.CHANGE
 
+            # I am choosing to move to the depot
             if (state == States.MOVE and action == Actions.REMAIN) or (state == States.WAIT and action == Actions.CHANGE):
                 time_to_depot = util.euclidean_distance(self.simulator.depot.coords, self.drone.coords) / self.drone.speed
-                cost = -time_to_depot * 2
+                cost = -time_to_depot * 2 # I receive a negative reward based on the time this choice will cost me
                 self._updateQ(state, action, cost, States.MOVE)
                 self.cur_state = States.MOVE
                 choice = -1
 
             else:
+                # choosing to wait
                 self.cur_state = States.WAIT # choice is already None
                 exp = self.drone.packet_is_expiring(self.simulator.cur_step)
 
                 if state == States.MOVE and action == Actions.CHANGE:
-                    reward = -100 * self.drone.buffer_length() if exp else 0
+                    reward = -100 * self.drone.buffer_length() if exp else 0 #reward is negative if some of my packets are about to expire
                     self._updateQ(state, action, reward, States.WAIT)
 
                 elif pkd_id not in self.waiting:
@@ -95,7 +96,8 @@ class AIRouting_final(BASE_routing):
                     self.waiting.add(pkd_id)
 
             if self.simulator.n_drones <= 5:
-                #we update the exploration probability using exponential decay formula
+                # we update the exploration probability using exponential decay formula
+                self.counter += 1
                 self.exp_prob = max(self.min_exp_prob, np.exp(-self.exp_decay*(self.counter)))
                     
         else:
