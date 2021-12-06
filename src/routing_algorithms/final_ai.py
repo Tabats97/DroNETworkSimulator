@@ -15,7 +15,7 @@ class Actions(Enum):
     CHANGE = auto()  # transition from one state to the other
 
 
-class AIRouting_gamma(BASE_routing):
+class AIRouting_final(BASE_routing):
     def __init__(self, drone, simulator):
         BASE_routing.__init__(self, drone, simulator)
         # random generator
@@ -23,6 +23,7 @@ class AIRouting_gamma(BASE_routing):
 
         self.gamma = 0.9
         self.alfa = 0.1
+        self.decay = None
 
         self.epsilon = 0.001 #epsilon-greedy
 
@@ -59,9 +60,15 @@ class AIRouting_gamma(BASE_routing):
             state = self.cur_state
             self.counter += 1
 
-            #epsilon greedy, with low probability we choose a random action
+            self.decay = self.simulator.n_drones < 5
             prob = self.rnd_for_routing_ai.rand()
-            if prob < self.exp_prob: #prob < self.epsilon:
+
+            #epsilon decay if the total number of drones in the simulation is < 5
+            if self.decay and prob < self.exp_prob:
+                action = self.rnd_for_routing_ai.choice(Actions)
+
+            #epsilon greedy, with low probability we choose a random action
+            elif not self.decay and prob < self.epsilon:
                 action = self.rnd_for_routing_ai.choice(Actions)
 
             #with high probability we choose the best action
@@ -114,7 +121,8 @@ class AIRouting_gamma(BASE_routing):
                 self.waiting.discard(pkd_id)  # note that at the next step I could add this packet again if the transmission was not successful
 
         #We update the exploration probability using exponential decay formula
-        self.exp_prob = max(self.min_exp_prob, np.exp(-self.exp_decay*(self.counter)))
+        if self.decay:
+            self.exp_prob = max(self.min_exp_prob, np.exp(-self.exp_decay*(self.counter)))
 
         return choice
 

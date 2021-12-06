@@ -3,8 +3,7 @@ from src.routing_algorithms.georouting import GeoRouting
 from src.routing_algorithms.georouting_w_move import GeoMoveRouting
 from src.routing_algorithms.random_routing import RandomRouting
 from src.routing_algorithms.closeset_to_me_routing import CloRouting
-from src.routing_algorithms.ai_routing_500_100 import AIRouting_500
-from src.routing_algorithms.ai_routing_1000_500 import AIRouting_1000
+from src.routing_algorithms.final_ai import AIRouting_final
 
 from enum import Enum
 
@@ -95,8 +94,8 @@ class RoutingAlgorithm(Enum):
     RND = RandomRouting
     MGEO = GeoMoveRouting
     CLO = CloRouting
-    AI_500 = AIRouting_500
-    AI_1000 = AIRouting_1000
+
+    AI = AIRouting_final
 
     @staticmethod
     def keylist():
@@ -113,8 +112,8 @@ class ChannelError(Enum):
         return list(map(lambda c: c.name, ChannelError))
 
 
-ROUTING_ALGORITHM_W_FEEDBACK = ["AI_500", "AI_1000"]
-ROUTING_ALGORITHM = RoutingAlgorithm.AI_500
+ROUTING_ALGORITHM_W_FEEDBACK = ["AI"]
+ROUTING_ALGORITHM = RoutingAlgorithm.AI
 CHANNEL_ERROR_TYPE = ChannelError.ON_DEVICE
 
 COMMUNICATION_P_SUCCESS = 1   # float: probability to have success in a communication.
