@@ -49,7 +49,7 @@ class AIRouting_final(BASE_routing):
     def relay_selection(self, opt_neighbors, pkd):
         
         if self.drone.move_routing: #if I am already returning to the depot then I keep all my packets
-            return None #alla fine ci si può fare un ragionamento
+            return None
 
         pkd_id = pkd.event_ref.identifier
         choice = None
@@ -60,15 +60,12 @@ class AIRouting_final(BASE_routing):
             state = self.cur_state
             self.counter += 1
 
-            self.decay = self.simulator.n_drones < 5
-            prob = self.rnd_for_routing_ai.rand()
-
-            #epsilon decay if the total number of drones in the simulation is < 5
-            if self.decay and prob < self.exp_prob:
-                action = self.rnd_for_routing_ai.choice(Actions)
+            #with up to 5 drones we use the epsilon decay, otherwise epsilon is fixed
+            random_case_prob = self.exp_prob if self.simulator.n_drones <= 5 else self.epsilon
 
             #epsilon greedy, with low probability we choose a random action
-            elif not self.decay and prob < self.epsilon:
+            prob = self.rnd_for_routing_ai.rand()
+            if prob < random_case_prob:
                 action = self.rnd_for_routing_ai.choice(Actions)
 
             #with high probability we choose the best action
@@ -96,6 +93,10 @@ class AIRouting_final(BASE_routing):
                     # the reward is delayed for this choice, it can either be positive or negative
                     # depending on if we will find a neighbour for the packet
                     self.waiting.add(pkd_id)
+
+            if self.simulator.n_drones <= 5:
+                #we update the exploration probability using exponential decay formula
+                self.exp_prob = max(self.min_exp_prob, np.exp(-self.exp_decay*(self.counter)))
                     
         else:
             best_choice = False
@@ -119,10 +120,6 @@ class AIRouting_final(BASE_routing):
                 reward = 500 if best_choice else 100
                 self._updateQ(States.WAIT, Actions.REMAIN, reward, States.WAIT)
                 self.waiting.discard(pkd_id)  # note that at the next step I could add this packet again if the transmission was not successful
-
-        #We update the exploration probability using exponential decay formula
-        if self.decay:
-            self.exp_prob = max(self.min_exp_prob, np.exp(-self.exp_decay*(self.counter)))
 
         return choice
 
